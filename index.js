@@ -1,13 +1,13 @@
 const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
+const mongoose = require("mongoose");
+const Listing = require("./model/Listing");
 
-scrapingResults = {
-  timePosted: "xxx",
-  title: "xxx",
-  address: "xxx",
-  price: "xxx",
-  specs: "bed, bath, sqft, avaliable",
-  url: "xxx"
+
+async function connectToMongoDb(){
+  const mongoUrl = "mongodb+srv://**YOUR ADMIN**:**YOUR PASSWORD**@cluster0.z4lwg.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
+  await mongoose.connect(mongoUrl, {useNewUrlParser: true, useUnifiedTopology: true});
+  console.log("connected to mongodb");
 }
 
 
@@ -34,7 +34,6 @@ async function scrapeListings(page) {
 }
 
 
-
 async function sleep(miliseconds) {
   return new Promise(resolve => setTimeout(resolve, miliseconds));
 }
@@ -46,29 +45,37 @@ async function scrapeDescriptions(listings, page) {
     await page.goto(listings[i].url);         //access the "url" that we scraped in scrapedListings
     const html = await page.content();
     const $ = cheerio.load(html);
-
     listings[i].address = $("div.mapaddress").text();
-    listings[i].specs = $(".shared-line-bubble").map((index, element) => { //loop through bed/bath, sqft, etc.
-      return $(element).text().toLowerCase(); //return the object to the array created by map()
+      const specs = $(".shared-line-bubble").map((index, element) => { //loop through bed/bath, sqft, etc.
+        return $(element).text().toLowerCase(); //return the object to the array created by map()
       }).get();
+    listings[i].specs = specs.join(", ");
+
+    const listingModel = new Listing(listings[i]);
+    await listingModel.save();
 
 
-    const random = (Math.random() + 1) * 1000;
-    await sleep(random); //1 - 1.99... seconds
+    const random = (Math.random() + 1) * 1000;  //1 - 1.99... seconds
+    await sleep(random);
   }
 }
 
 
-
 async function main() {
+  while(true){
+  await connectToMongoDb();
   const browser = await puppeteer.launch({
     headless: false
   });
+
   const page = await browser.newPage();
   const listings = await scrapeListings(page); //Calls listings functions
-
   const listingsWithDespcriptions = await scrapeDescriptions(listings, page);
+
+  await page.close();
+  await browser.close();
   console.log(listings);
+  }
 }
 
 main();
