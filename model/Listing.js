@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const listingSchema = new mongoose.Schema({
   timePosted: Date,
+  daysAgo: Number,
   title: String,
   address: String,
   price: String,
