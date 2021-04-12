@@ -5,17 +5,17 @@ const mongoose = require("mongoose");
 const Listing = require("./model/Listing");
 const send = require('gmail-send')({
     user: 'lilcrawler626@gmail.com',
-    pass: 'lilCrawler#626',
-    to: '8479515450@tmomail.net',
+    pass: 'XXX',
+    to: 'XXX@tmomail.net',
     subject: 'New House',
     text: 'url'});
 
-const dbAdmin = "admin";
-const adminPassword = "newAdminPassword";
+const dbAdmin = "XXX";
+const adminPassword = "XXX";
 const logIn = dbAdmin + ":" + adminPassword;
 
 const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=4700&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
+const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=4500&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
 
 
 async function main() {                                             //MAIN FUNCTION OF THE PROGRAM
@@ -28,7 +28,7 @@ async function main() {                                             //MAIN FUNCT
       const browser = await puppeteer.launch({ headless: false });
       const page = await browser.newPage();
       let listings = await scrapeListings(page);                          //scrape the "housing home page" listings
-      const newListings = await difference(listings, prevListings);  //find new house listings that don't exist in the "prevListings"
+      let newListings = await difference(listings, prevListings);  //find new house listings that don't exist in the "prevListings"
       console.log("NEW LISTINGS", newListings);
       if(newListings.length != 0) {
         newListings = await scrapeListingsDescriptions(newListings, page); //scrape the descriptions of each of the house listing
@@ -135,7 +135,6 @@ function difference(listings, prevListings) {            //FUNCTION TO RETURN AL
 async function scrapeListingsDescriptions(listings, page) {    //FUNCTION TO SCRAPE THE DESCRIPTION PAGE OF EACH LISTING...
   try {                                                        //..., UPDATE THE LISTING VALUES, AND RETURN AN ARRAY OF UPDATED LISTINGS
     for (var i = 0; i < listings.length; i++) {                //loop through every listing in "listings"
-      console.log(listings.length - i);
       await page.goto(listings[i].url);                        //access the "url" for each listing
       const html = await page.content();
       const $ = cheerio.load(html);
