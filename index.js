@@ -3,31 +3,46 @@ const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
 const mongoose = require("mongoose");
 const Listing = require("./model/Listing");
+const send = require('gmail-send')({
+    user: 'lilcrawler626@gmail.com',
+    pass: 'lilCrawler#626',
+    to: '8479515450@tmomail.net',
+    subject: 'New House',
+    text: 'url'});
 
-const dbAdmin = *ENTER YOUR MONGODB ATLAS, DATABASE USERNAME*;
-const adminPassword = *ENTER YOUR MONGODB ATLAS, USERNAME PASSWORD*;
+const dbAdmin = "admin";
+const adminPassword = "newAdminPassword";
 const logIn = dbAdmin + ":" + adminPassword;
 
-const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=1700&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
+const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
+const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=4700&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
 
 
 async function main() {                                             //MAIN FUNCTION OF THE PROGRAM
   while (true) {
     try {
       await connectToMongoDb();
-      const collectionArray = await dropCollection(Listing);        //drop the current "listings" collection and return its contents
+      let prevListings = await dropCollection(Listing);                 //drop the current "listings" collection and return its contents
+      prevListings = await removeKey(prevListings, "_id");
+      console.log("PREVIOUS LISTINGS", prevListings);
       const browser = await puppeteer.launch({ headless: false });
       const page = await browser.newPage();
-      let listings = await scrapeListings(page);                    //scrape the "housing home page" listings
-      listings = await scrapeListingsDescriptions(listings, page);  //scrape the descriptions of each of the house listing
-      listings = await sortListings(listings);                      //sort listings by "daysAgo" posted (newest first)
-      await saveListings(listings);                                 //save listings as the MongoDB "Listings" collection
+      let listings = await scrapeListings(page);                          //scrape the "housing home page" listings
+      const newListings = await difference(listings, prevListings);  //find new house listings that don't exist in the "prevListings"
+      console.log("NEW LISTINGS", newListings);
+      if(newListings.length != 0) {
+        newListings = await scrapeListingsDescriptions(newListings, page); //scrape the descriptions of each of the house listing
+        newLlistings = await sortListings(newListings, "daysAgo");                     //sort listings by "daysAgo" posted (newest first)
+        await sendListings(newListings);
+      }
+      listings = await scrapeListingsDescriptions(listings, page);
+      listings = await sortListings(listings, "daysAgo");                     //sort listings by "daysAgo" posted (newest first)
+      await saveListings(listings);
       await page.close();
       await browser.close();
-      console.log(listings);
+      await mongoose.connection.close();
       process.exit(0);
-    } catch (err) {                                       //if main() function fails
+    } catch(err) {                                       //if main() function fails
       console.log(err);
       process.exit(0);
     }
@@ -41,22 +56,34 @@ async function connectToMongoDb() {                      //FUNCTION TO CONNECT T
       useUnifiedTopology: true
     })
     console.log("connected to mongodb");
-  } catch (err) {                                        //log error if connection fails
+  } catch(err) {                                        //log error if connection fails
     console.log(err);
     process.exit(0);
   }
 }
 
-async function dropCollection(model) {                            //FUNCTION TO RETURN ALL ITEMS OF A COLLECTION AS AN ARRAY...
-  try {                                                           //...AND *DROPS* THE COLLECTION
-    const collection = await model.find({});                      //get all contents of the collection
-    if (collection.length !== 0) {
-      await mongoose.connection.db.dropCollection('listings', (err, res) => { //drop the collection
-          assert.equal(err, null);
-      });
+async function dropCollection(model) {                          //FUNCTION TO RETURN ALL ITEMS OF A COLLECTION AS AN ARRAY...
+  let collection = []
+  try {                                                         //...AND *DROPS* THE COLLECTION
+    collection = await Listing.find({});
+    await Listing.collection.drop();
+  } catch(err) {
+    collection = [];
+    console.log(err);
+  } finally {
+    await mongoose.connection.close();
+    await connectToMongoDb();
+    return collection;
+  }
+}
+
+async function removeKey(listings, key){
+  try{
+    for(var i = 0; i < listings.length; i++) {
+        await delete listings[i]._id;
     }
-    return collection;                                           //return the collection as an array of objects
-  } catch (err) {
+    return listings;
+  }catch(err){
     console.log(err);
     process.exit(0);
   }
@@ -91,11 +118,19 @@ async function scrapeListings(page) {                           //FUNCTION TO SC
       };
     }).get();
     return listings;                                           //return the array of scraped listings
-  } catch {
+  } catch(err) {
     console.log(err);                                          //log error if scraping listings fails
     process.exit(0);
   }
 }
+
+function difference(listings, prevListings) {            //FUNCTION TO RETURN ALL LISTINGS THAT EXIST IN "listings"...//...BUT NOT IN "prevListings"
+  return listings.filter(listing => {
+    return prevListings.filter(prevL => {
+      return prevL.title == listing.title
+      }).length == 0;
+    });
+  }                                                      //...found in "prevListings"
 
 async function scrapeListingsDescriptions(listings, page) {    //FUNCTION TO SCRAPE THE DESCRIPTION PAGE OF EACH LISTING...
   try {                                                        //..., UPDATE THE LISTING VALUES, AND RETURN AN ARRAY OF UPDATED LISTINGS
@@ -109,11 +144,11 @@ async function scrapeListingsDescriptions(listings, page) {    //FUNCTION TO SCR
       listings[i].daysAgo = daysAgo(listings[i], daysAgoElement);
       listings[i].address = $("div.mapaddress").text();
       listings[i].specs = $format($, specsElements);
-      const random = (Math.random() + 0.5) * 1000;            //0.5 - 1.499... seconds
+      const random = (Math.random() + 0.4) * 1000;            //0.4 - 1.399... seconds
       await sleep(random);                                    //buffer in order to prevent being blocked from craigslist
     }
     return listings;
-  } catch {
+  } catch(err) {
     console.log(err);                                         //log error if scraping listings' descriptions fails
     process.exit(0);
   }
@@ -146,7 +181,7 @@ function $format($, elements) {                      //FUNCTION TO PARSE THE TEX
       return $(element).text().toLowerCase();        //return the text string to the map() array
     }).get();
     return array.join(", ");                         //join all the text strings with a comma and a space
-  } catch {
+  } catch(err) {
     console.log(err);                                //log error if formatting the elements fails
     process.exit(0);
   }
@@ -156,13 +191,13 @@ async function sleep(miliseconds) {
   return new Promise(resolve => setTimeout(resolve, miliseconds));
 }
 
-function sortListings(listings) {                   //FUNCTION TO SORT LISTINGS
+function sortListings(listings, key) {              //FUNCTION TO SORT LISTINGS
   try {
     listings.sort((a, b) => {                       //sort listings by "daysAgo" key value
-      return a.daysAgo - b.daysAgo;
+      return a.key - b.key;
     });
     return listings;
-  } catch {
+  } catch(err) {
     console.log(err);                               //log error if sorting the listings fails
     process.exit(0);
   }
@@ -174,9 +209,21 @@ async function saveListings(listings) {
       const listingModel = new Listing(listings[i]);  //initialize a mongoose schema "Listing" with the current listing
       await listingModel.save();                      //save the "Listing" to the database
     }
-  } catch {
+  } catch(err) {
     console.log(err);                                 //log error if saving the listing fails
     process.exit(0);
   }
 }
+
+async function sendListings(listings) {
+  try{
+    for(var i = 0; i < listings.length; i++) {
+      const {result,full} = await send({text: listings[i].url});
+      console.log(result);
+    }
+  }catch(err) {
+    console.log(err)
+  }
+}
+
 main();
