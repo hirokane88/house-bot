@@ -15,7 +15,7 @@ const adminPassword = "XXX";
 const logIn = dbAdmin + ":" + adminPassword;
 
 const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=4500&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
+const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=5000&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
 
 
 async function main() {                                             //MAIN FUNCTION OF THE PROGRAM
@@ -24,24 +24,25 @@ async function main() {                                             //MAIN FUNCT
       await connectToMongoDb();
       let prevListings = await dropCollection(Listing);                 //drop the current "listings" collection and return its contents
       prevListings = await removeKey(prevListings, "_id");
-      console.log("PREVIOUS LISTINGS", prevListings);
-      const browser = await puppeteer.launch({ headless: false });
+      console.log("prevListings", prevListings);
+      const browser = await puppeteer.launch({ headless: true });
       const page = await browser.newPage();
       let listings = await scrapeListings(page);                          //scrape the "housing home page" listings
       let newListings = await difference(listings, prevListings);  //find new house listings that don't exist in the "prevListings"
-      console.log("NEW LISTINGS", newListings);
+      console.log("newListings", newListings);
       if(newListings.length != 0) {
+        console.log("NEW listings:");
         newListings = await scrapeListingsDescriptions(newListings, page); //scrape the descriptions of each of the house listing
         newLlistings = await sortListings(newListings, "daysAgo");                     //sort listings by "daysAgo" posted (newest first)
         await sendListings(newListings);
       }
+      console.log("ALL listings:");
       listings = await scrapeListingsDescriptions(listings, page);
       listings = await sortListings(listings, "daysAgo");                     //sort listings by "daysAgo" posted (newest first)
       await saveListings(listings);
       await page.close();
       await browser.close();
       await mongoose.connection.close();
-      process.exit(0);
     } catch(err) {                                       //if main() function fails
       console.log(err);
       process.exit(0);
@@ -63,6 +64,7 @@ async function connectToMongoDb() {                      //FUNCTION TO CONNECT T
 }
 
 async function dropCollection(model) {                          //FUNCTION TO RETURN ALL ITEMS OF A COLLECTION AS AN ARRAY...
+  console.log("dropping & returning db collection...")
   let collection = []
   try {                                                         //...AND *DROPS* THE COLLECTION
     collection = await Listing.find({});
@@ -71,8 +73,6 @@ async function dropCollection(model) {                          //FUNCTION TO RE
     collection = [];
     console.log(err);
   } finally {
-    await mongoose.connection.close();
-    await connectToMongoDb();
     return collection;
   }
 }
@@ -90,6 +90,7 @@ async function removeKey(listings, key){
 }
 
 async function scrapeListings(page) {                           //FUNCTION TO SCRAPE LISTINGS FROM THE CRAIGSLIST HOUSING, MAIN PAGE...
+  console.log("scraping listings page...");
   try {                                                         //...AND RETURN THE LISTINGS AS AN ARRAY OF OBJECTS
     await page.goto(housingPageURL);                            //access a craiglist housing page via url
     const html = await page.content();
@@ -99,16 +100,19 @@ async function scrapeListings(page) {                           //FUNCTION TO SC
       const titleElement = $(element).find(".result-title");
       const resultPriceElement = $(element).find(".result-meta").find(".result-price");
       const timePosted = new Date($(timeElement).attr("datetime"));
-      const title = $(titleElement).text().toLowerCase();
+      const timeFormat = $(timeElement).attr("title");
+      const daysAgo = "999999";
+      const title = $(titleElement).text();
+      const address = "null";
       const price = $(resultPriceElement).text();
       const url = $(titleElement).attr("href");
-      title.trim();
-      price.trim();
-      const daysAgo = "999999";                                //add default values for items that still need to be scraped
-      const address = "null";
       const specs = "null";
+      title.trim();
+      timeFormat.trim();
+      price.trim();
       return {                                                 //return the current listing with its scraped values
         timePosted,
+        timeFormat,
         daysAgo,
         title,
         address,
@@ -133,8 +137,10 @@ function difference(listings, prevListings) {            //FUNCTION TO RETURN AL
   }                                                      //...found in "prevListings"
 
 async function scrapeListingsDescriptions(listings, page) {    //FUNCTION TO SCRAPE THE DESCRIPTION PAGE OF EACH LISTING...
+  console.log("scraping descriptions...");
   try {                                                        //..., UPDATE THE LISTING VALUES, AND RETURN AN ARRAY OF UPDATED LISTINGS
     for (var i = 0; i < listings.length; i++) {                //loop through every listing in "listings"
+      console.log(listings.length - i);
       await page.goto(listings[i].url);                        //access the "url" for each listing
       const html = await page.content();
       const $ = cheerio.load(html);
@@ -191,9 +197,10 @@ async function sleep(miliseconds) {
 }
 
 function sortListings(listings, key) {              //FUNCTION TO SORT LISTINGS
+  console.log("sorting...");
   try {
     listings.sort((a, b) => {                       //sort listings by "daysAgo" key value
-      return a.key - b.key;
+      return a.daysAgo - b.daysAgo;
     });
     return listings;
   } catch(err) {
@@ -203,6 +210,7 @@ function sortListings(listings, key) {              //FUNCTION TO SORT LISTINGS
 }
 
 async function saveListings(listings) {
+  console.log("saving...");
   try {
     for (var i = 0; i < listings.length; i++) {       //loop through every single listing in "listings"
       const listingModel = new Listing(listings[i]);  //initialize a mongoose schema "Listing" with the current listing
@@ -215,9 +223,22 @@ async function saveListings(listings) {
 }
 
 async function sendListings(listings) {
+  console.log("sending...");
   try{
-    for(var i = 0; i < listings.length; i++) {
-      const {result,full} = await send({text: listings[i].url});
+    for(var i = listings.length-1; i >= 0; i--) {
+      const bar = "\n_______________________";
+      const dashes = "\n----------------------";
+      const timeFormat = "\n " + listings[i].timeFormat;
+      const title = "\n" + listings[i].title;
+      const address = "\n| " + listings[i].address;
+      const price = "\n| " + listings[i].price;
+      const specs = "\n| " + listings[i].specs;
+      const url = "\n" + listings[i].url;
+      const message =  bar + title + dashes + address + price + specs + url;
+      const {result,full} = await send({
+        subject: timeFormat,
+        text: message
+      });
       console.log(result);
     }
   }catch(err) {
