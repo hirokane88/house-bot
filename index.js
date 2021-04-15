@@ -4,18 +4,18 @@ const cheerio = require("cheerio");
 const mongoose = require("mongoose");
 const Listing = require("./model/Listing");
 const send = require('gmail-send')({
-    user: 'lilcrawler626@gmail.com',
-    pass: 'XXX',
-    to: 'XXX@tmomail.net',
-    subject: 'New House',
+    user: '',
+    pass: '',
+    to: [],
+    subject: 'New House Found...',
     text: 'url'});
 
-const dbAdmin = "XXX";
-const adminPassword = "XXX";
+const dbAdmin = "";
+const adminPassword = "";
 const logIn = dbAdmin + ":" + adminPassword;
 
 const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=5000&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
+const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=5800&min_bedrooms=4&availabilityMode=0&sale_date=all+dates" //Craigslist housing page to be scraped
 
 
 async function main() {                                             //MAIN FUNCTION OF THE PROGRAM
@@ -44,6 +44,11 @@ async function main() {                                             //MAIN FUNCT
       await browser.close();
       await mongoose.connection.close();
     } catch(err) {                                       //if main() function fails
+      const {result,full} = await send({
+        subject: "Program Stopped",
+        text: "" + err
+      });
+      console.log(result);
       console.log(err);
       process.exit(0);
     }
@@ -101,12 +106,12 @@ async function scrapeListings(page) {                           //FUNCTION TO SC
       const resultPriceElement = $(element).find(".result-meta").find(".result-price");
       const timePosted = new Date($(timeElement).attr("datetime"));
       const timeFormat = $(timeElement).attr("title");
-      const daysAgo = "999999";
+      const daysAgo = "-1";
       const title = $(titleElement).text();
-      const address = "null";
+      const address = "N/A";
       const price = $(resultPriceElement).text();
       const url = $(titleElement).attr("href");
-      const specs = "null";
+      const specs = "N/A";
       title.trim();
       timeFormat.trim();
       price.trim();
@@ -226,15 +231,15 @@ async function sendListings(listings) {
   console.log("sending...");
   try{
     for(var i = listings.length-1; i >= 0; i--) {
-      const bar = "\n_______________________";
-      const dashes = "\n----------------------";
+      const bar = "\n_______________________ ";
+      const dashes = "\n---------------------- ";
       const timeFormat = "\n " + listings[i].timeFormat;
       const title = "\n" + listings[i].title;
       const address = "\n| " + listings[i].address;
       const price = "\n| " + listings[i].price;
       const specs = "\n| " + listings[i].specs;
       const url = "\n" + listings[i].url;
-      const message =  bar + title + dashes + address + price + specs + url;
+      const message =  url;
       const {result,full} = await send({
         subject: timeFormat,
         text: message

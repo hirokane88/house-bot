@@ -1,17 +1,27 @@
 {
-  "name": "housing_scraper",
+  "name": "housing-scraper",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.6",
+    "gmail-send": "^1.8.10",
+    "mongoose": "^5.12.4",
+    "puppeteer": "^8.0.0"
+  },
+  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hirokane88/housing-scraper.git"
+  },
+  "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "cheerio": "^1.0.0-rc.5",
-    "gmail-send": "^1.8.10",
-    "mongoose": "^5.12.3",
-    "puppeteer": "^8.0.0"
-  }
+  "bugs": {
+    "url": "https://github.com/hirokane88/housing-scraper/issues"
+  },
+  "homepage": "https://github.com/hirokane88/housing-scraper#readme"
 }
