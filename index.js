@@ -7,7 +7,7 @@ const send = require('gmail-send')({
     user: '',
     pass: '',
     to: [''],
-    subject: 'New House Found...',
+    subject: '',
     text: ''});
 
 const dbAdmin = "";
@@ -28,21 +28,19 @@ async function main() {                                                   //MAIN
       await sleep(random);
       const page = await browser.newPage();
       let prevListings = await getCollection(Listing);                    //drop the current "listings" collection and return its contents
-      prevListings = await removeKey(prevListings, "_id");
+      prevListings = await removeID(prevListings);
       let listings = await scrapeListings(page);                          //scrape the "housing home page" listings
       let newListings = await difference(listings, prevListings);         //find new house listings that don't exist in the "prevListings"...
       if(newListings.length == 0 && prevListings.length != 0) {           //...but exist in "listings"
-        console.log("no new listings");
-      }else if(newListings.length != 0 && prevListings.length != 0){      //if there are new listings and this is not the first iteration...
-        console.log("NEW listings:");                                     //...of the program
+        console.log("no new postings");
+      } else if (newListings.length != 0 && prevListings.length != 0){    //if there are new listings and this is not the first iteration...
+        console.log("NEW Postings:");                                     //...of the program
         newListings = await scrapeListingsDescriptions(newListings, page);//scrape the descriptions of each of the new listing
-        newListings = newListings.filter(newListing => {                  //filter out reposts
-          newListing.daysAgo == 0;
-        });
-        if(newListings.length == 0) {                                   //if all newListings were reposts
+        newListings = filterReposts(newListings);                         //remove old reposts to find newListings
+        if(newListings.length == 0) {                                     //if all newListings are reposts
           console.log("no new listings");
           continue;
-        }else{
+        } else {
           console.log("NEW LISTINGS", newListings);
           await sendListings(newListings);                              //send the the new listings via text/email
           console.log("ALL listings:");
@@ -52,7 +50,7 @@ async function main() {                                                   //MAIN
           await Listing.collection.drop();                              //drop the current db collection
           await saveListings(listings);                                 //save the updated listings into the db collection
         }
-      }else{
+      } else {
         console.log("ALL listings:");                                   //"first iteration" case of the program
         listings = await scrapeListingsDescriptions(listings, page);
         listings = await sortListings(listings);
@@ -105,10 +103,10 @@ async function getCollection(model) {               //FUNCTION TO RETURN ALL ITE
   }
 }
 
-async function removeKey(listings, key){            //FUNCTION THAT REMOVES A KEY FROM AN ARRAY OF OBJECTS
+async function removeID(listings){                  //FUNCTION THAT REMOVES A KEY FROM AN ARRAY OF OBJECTS
   try{
     for(var i = 0; i < listings.length; i++) {      //for every object in array
-        await delete listings[i].key;               //remove the key
+        await delete listings[i]._id;               //remove the key
     }
     return listings;
   }catch(err){
@@ -218,6 +216,16 @@ function $format($, elements) {                      //FUNCTION TO PARSE THE TEX
   } catch(err) {
     console.log(err);                                //log error if formatting the elements fails
   }
+}
+
+function filterReposts(listings) {
+  let newListings = [];
+  for(var i = 0; i < listings.length; i++) {
+    if(listings[i].daysAgo === 0){
+      newListings.push(listings[i]);
+    }
+  }
+  return newListings;
 }
 
 function sortListings(listings) {                   //FUNCTION TO SORT LISTINGS by "daysAgo" key value
