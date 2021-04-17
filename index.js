@@ -14,9 +14,8 @@ const dbAdmin = "";
 const adminPassword = "";
 const logIn = dbAdmin + ":" + adminPassword;
 const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?sort=date&availabilityMode=0&postal=95060"; //Craigslist housing page to be scraped
+const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?sort=date&postal=95060&max_price=5800&min_bedrooms=4&availabilityMode=0&sale_date=all+dates"; //Craigslist housing page to be scraped
 const random = (Math.random() + 0.4) * 1000;                              //0.4 - 1.399... seconds
-
 
 async function main() {                                                   //MAIN FUNCTION OF THE PROGRAM
   await connectToMongoDb();
@@ -265,7 +264,7 @@ async function sendListings(listings) {
       const message = bar + title + dashes + address + price + specs + url;
       const sent = await send({
         subject: timeFormat,
-        text: message
+        text: url
       });
       console.log(sent.result);
       // const sent = await send({
