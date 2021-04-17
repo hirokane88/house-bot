@@ -14,9 +14,7 @@ const dbAdmin = "";
 const adminPassword = "";
 const logIn = dbAdmin + ":" + adminPassword;
 const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const testUrl1 = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=4300&min_bedrooms=4&availabilityMode=0&sale_date=all+dates";
-const testUrl2 = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=6000&min_bedrooms=5&availabilityMode=0&sale_date=all+dates";
-const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&availabilityMode=0&sale_date=all+dates"; //Craigslist housing page to be scraped
+const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?sort=date&availabilityMode=0&postal=95060"; //Craigslist housing page to be scraped
 const random = (Math.random() + 0.4) * 1000;                              //0.4 - 1.399... seconds
 
 
@@ -27,11 +25,11 @@ async function main() {                                                   //MAIN
     try {
       await sleep(random);
       const page = await browser.newPage();
-      let prevListings = await getCollection(Listing);                    //drop the current "listings" collection and return its contents
+      let prevListings = await getCollection(Listing);                    //return the current db collection "listings" as prevListings
       prevListings = await removeID(prevListings);
-      let listings = await scrapeListings(page);                          //scrape the "housing home page" listings
-      let newListings = await difference(listings, prevListings);         //find new house listings that don't exist in the "prevListings"...
-      if(newListings.length == 0 && prevListings.length != 0) {           //...but exist in "listings"
+      let listings = await scrapeListings(page);                          //scrape the craigslist "housing page" to get the current listings
+      let newListings = await difference(listings, prevListings);         //find house listings that exist in "listings" but don't...
+      if(newListings.length == 0 && prevListings.length != 0) {           //...exist in "prevListings"
         console.log("no new postings");
       } else if (newListings.length != 0 && prevListings.length != 0){    //if there are new listings and this is not the first iteration...
         console.log("NEW Postings:");                                     //...of the program
