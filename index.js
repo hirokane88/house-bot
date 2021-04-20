@@ -3,19 +3,18 @@ const puppeteer = require("puppeteer");
 const cheerio = require("cheerio");
 const mongoose = require("mongoose");
 const Listing = require("./model/Listing");
+const pass = require("./pass/pass");
 const send = require('gmail-send')({
-    user: '',
-    pass: '',
-    to: [''],
-    subject: '',
-    text: ''});
+    user: pass.email,
+    pass: pass.ePass,
+    to: pass.contacts,
+    subject: 'new house',
+    text: 'url'});
 
-const dbAdmin = "";
-const adminPassword = "";
+const dbAdmin = pass.adminUser;
+const adminPassword = pass.adminPass;
 const logIn = dbAdmin + ":" + adminPassword;
 const mongoUrl = "mongodb+srv://"+logIn+"@cluster0.z4lwg.mongodb.net/dbOne?retryWrites=true&w=majority";  //MongoDB Atlas account connection
-const testUrl1 = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=4300&min_bedrooms=4&availabilityMode=0&sale_date=all+dates";
-const testUrl2 = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&max_price=6000&min_bedrooms=5&availabilityMode=0&sale_date=all+dates";
 const housingPageURL = "https://sfbay.craigslist.org/search/scz/apa?postal=95060&availabilityMode=0&sale_date=all+dates"; //Craigslist housing page to be scraped
 const random = (Math.random() + 0.4) * 1000;                              //0.4 - 1.399... seconds
 
